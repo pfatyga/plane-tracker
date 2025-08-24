@@ -1,69 +1,55 @@
-# React + TypeScript + Vite
+# Plane Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Plane Tracker is a React + Leaflet web application for visualizing live aircraft positions. It is designed to work with [`antirez/dump1090`](https://github.com/antirez/dump1090), a Mode S decoder for RTLSDR devices.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Displays aircraft positions and trails on a map using OpenStreetMap tiles.
+- Shows flight details, altitude, speed, and distance from your location.
+- Plane icons rotate and scale based on heading and altitude.
+- Interactive sidebar listing all seen flights, sorted by activity and proximity.
+- User location marker (if geolocation is enabled).
+- Adjustable update frequency for live data polling.
 
-## Expanding the ESLint configuration
+## Usage
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Run dump1090**
+   Start [`dump1090`](https://github.com/antirez/dump1090) with networking enabled:
+   ```sh
+   ./dump1090 --net
+   ```
+   This will start an HTTP server on port 8080 and provide live aircraft data at `http://localhost:8080/data.json`.
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+2. **Run Plane Tracker**
+   - Install dependencies:
+     ```sh
+     npm install
+     ```
+   - Start the development server:
+     ```sh
+     npm start
+     ```
+   - Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+3. **View live aircraft**
+   The app will fetch data from `http://localhost:8080/data.json` and display aircraft on the map.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Requirements
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- Node.js and npm
+- [`dump1090`](https://github.com/antirez/dump1090) running with `--net` option
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Configuration
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- The data source URL is set to `http://localhost:8080/data.json` in [`src/App.tsx`](src/App.tsx).
+- You can adjust the update frequency in the UI.
+
+## License
+
+AGPLv3 (for Plane Tracker).
+See [`dump1090`](https://github.com/antirez/dump1090) for its own license.
+
+## Credits
+
+- [`dump1090`](https://github.com/antirez/dump1090) by Salvatore Sanfilippo
+- Plane icon SVG adapted

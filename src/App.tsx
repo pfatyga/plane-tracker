@@ -39,9 +39,23 @@ function haversineDistance(
   return R * c; // distance in km
 }
 
+function getScaleFromAltitude(altitude: number): number {
+  // normalize between 0.5x (ground) and 2x (40,000 ft)
+  const minAlt = 0;
+  const maxAlt = 40000;
+  const minScale = 0.5;
+  const maxScale = 2.0;
+
+  const clamped = Math.max(minAlt, Math.min(maxAlt, altitude));
+  return minScale + ((clamped - minAlt) / (maxAlt - minAlt)) * (maxScale - minScale);
+}
+
+
 // Custom plane icon (SVG) that can rotate
-const planeIcon = (track: number, active: boolean, selected: boolean) =>
-  L.divIcon({
+const planeIcon = (track: number, altitude: number, active: boolean, selected: boolean) => {
+  const scale = getScaleFromAltitude(altitude);
+
+  return L.divIcon({
     className: "plane-icon",
     html: `
       <svg xmlns="http://www.w3.org/2000/svg"
@@ -49,13 +63,14 @@ const planeIcon = (track: number, active: boolean, selected: boolean) =>
            width="24" height="24"
            stroke=${selected ? "yellow" : ""} stroke-width="2"
            fill=${active ? "blue" : "gray"}
-           style="transform: rotate(${track}deg); transform-origin: center;">
+           style="transform: rotate(${track}deg) scale(${scale}); transform-origin: center;">
         <path d="M2 16.5l9-4.5V3.5c0-.83.67-1.5 1.5-1.5S14 2.67 14 3.5v8.5l9 4.5v2l-9-2v4l2 1.5v1h-8v-1l2-1.5v-4l-9 2v-2z"/>
       </svg>
     `,
     iconSize: [24, 24],
     iconAnchor: [12, 12], // rotate around center
   });
+}
 
 const userIcon = new DivIcon({
   html: `<div class="pulse"></div>`,
@@ -70,7 +85,7 @@ function AnimatedMarker({ plane, onClick, home, selectedFlight }: { plane: Plane
 
   useEffect(() => {
     if (markerRef.current) {
-      markerRef.current.setIcon(planeIcon(plane.track, plane.active, selectedFlight === plane.flight.trim()));
+      markerRef.current.setIcon(planeIcon(plane.track, plane.altitude, plane.active, selectedFlight === plane.flight.trim()));
       markerRef.current.setLatLng([plane.lat, plane.lon]);
     }
   }, [plane]);
@@ -79,7 +94,7 @@ function AnimatedMarker({ plane, onClick, home, selectedFlight }: { plane: Plane
     <Marker
       ref={markerRef}
       position={[plane.lat, plane.lon]}
-      icon={planeIcon(plane.track, plane.active, selectedFlight === plane.flight.trim()) as DivIcon}
+      icon={planeIcon(plane.track, plane.altitude, plane.active, selectedFlight === plane.flight.trim()) as DivIcon}
       eventHandlers={{ click: onClick }}
     >
       <Popup>

@@ -14,6 +14,7 @@ interface Plane {
   altitude: number;
   track: number;
   speed: number;
+  active: boolean;
 }
 
 function haversineDistance(
@@ -39,14 +40,14 @@ function haversineDistance(
 }
 
 // Custom plane icon (SVG) that can rotate
-const planeIcon = (track: number) =>
+const planeIcon = (track: number, active: boolean) =>
   L.divIcon({
     className: "plane-icon",
     html: `
       <svg xmlns="http://www.w3.org/2000/svg"
            viewBox="0 0 24 24"
            width="24" height="24"
-           fill="blue"
+           fill=${active ? "blue" : "gray"}
            style="transform: rotate(${track}deg); transform-origin: center;">
         <path d="M2 16.5l9-4.5V3.5c0-.83.67-1.5 1.5-1.5S14 2.67 14 3.5v8.5l9 4.5v2l-9-2v4l2 1.5v1h-8v-1l2-1.5v-4l-9 2v-2z"/>
       </svg>
@@ -68,7 +69,7 @@ function AnimatedMarker({ plane, onClick, home }: { plane: Plane; onClick: () =>
 
   useEffect(() => {
     if (markerRef.current) {
-      markerRef.current.setIcon(planeIcon(plane.track));
+      markerRef.current.setIcon(planeIcon(plane.track, plane.active));
       markerRef.current.setLatLng([plane.lat, plane.lon]);
     }
   }, [plane]);
@@ -77,11 +78,12 @@ function AnimatedMarker({ plane, onClick, home }: { plane: Plane; onClick: () =>
     <Marker
       ref={markerRef}
       position={[plane.lat, plane.lon]}
-      icon={planeIcon(plane.track) as DivIcon}
+      icon={planeIcon(plane.track, plane.active) as DivIcon}
       eventHandlers={{ click: onClick }}
     >
       <Popup>
         <div>
+          <div><b>Active:</b> {plane.active ? "true" : "false"}</div>
           <div><b>Flight:</b> {plane.flight || "N/A"}</div>
           <div><b>Altitude:</b> {plane.altitude} ft</div>
           <div><b>Speed:</b> {plane.speed} kts</div>
@@ -106,8 +108,17 @@ export default function App() {
   const [planes, setPlanes] = useState<Plane[]>([]);
   const [planeTrails, setPlaneTrails] = useState<Record<string, [number, number][]>>({});
   const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
-  const [flightDetails, setFlightDetails] = useState<any>(null);
+  // const [flightDetails, setFlightDetails] = useState<any>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [updateInterval, setUpdateInterval] = useState<number>(500);
+
+  // Handler to change update frequency
+  const handleIntervalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(e.target.value);
+    if (!isNaN(value) && value >= 100) {
+      setUpdateInterval(value);
+    }
+  };
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -129,7 +140,24 @@ export default function App() {
         const res = await fetch("http://localhost:8080/data.json");
         const data: Plane[] = await res.json();
 
-        setPlanes(data);
+        setPlanes((prevPlanes) => {
+          const dataHexSet = new Set(data.map(p => p.hex));
+          const planeMap = new Map(prevPlanes.map(p => [p.hex, p]));
+
+          // Update or add planes from new data
+          data.forEach((plane) => {
+            planeMap.set(plane.hex, { ...plane, active: true });
+          });
+
+          // Mark planes not in new data as inactive
+          planeMap.forEach((plane, hex) => {
+            if (!dataHexSet.has(hex)) {
+              planeMap.set(hex, { ...plane, active: false });
+            }
+          });
+
+          return Array.from(planeMap.values());
+        });
 
         // Update trails
         setPlaneTrails((prev) => {
@@ -152,30 +180,48 @@ export default function App() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 500);
+    const interval = setInterval(fetchData, updateInterval);
     return () => clearInterval(interval);
-  }, []);
+  }, [updateInterval]);
 
-  // Fetch extra flight details
-  useEffect(() => {
-    if (!selectedFlight) return;
+  // // Fetch extra flight details
+  // useEffect(() => {
+  //   if (!selectedFlight) return;
 
-    const fetchFlightDetails = async () => {
-      try {
-        const res = await fetch(`https://api.example.com/flight/${selectedFlight}`);
-        const details = await res.json();
-        setFlightDetails(details);
-      } catch (err) {
-        console.error("Error fetching flight details:", err);
-        setFlightDetails(null);
-      }
-    };
+  //   const fetchFlightDetails = async () => {
+  //     try {
+  //       const res = await fetch(`https://api.example.com/flight/${selectedFlight}`);
+  //       const details = await res.json();
+  //       setFlightDetails(details);
+  //     } catch (err) {
+  //       console.error("Error fetching flight details:", err);
+  //       setFlightDetails(null);
+  //     }
+  //   };
 
-    fetchFlightDetails();
-  }, [selectedFlight]);
+  //   fetchFlightDetails();
+  // }, [selectedFlight]);
+
+  // UI control for update frequency
+  const updateFrequencyControl = (
+    <div className="absolute top-4 left-4 bg-white p-2 rounded shadow-md">
+      <label>
+        Update frequency (ms):{" "}
+        <input
+          type="number"
+          min={100}
+          step={100}
+          value={updateInterval}
+          onChange={handleIntervalChange}
+          className="border rounded px-2 py-1 w-24"
+        />
+      </label>
+    </div>
+  );
 
   return (
     <div style={{ width: "100vw", height: "100vh" }} className="w-full h-screen">
+      {/* {updateFrequencyControl} */}
       <MapContainer center={[39.9, -75.1]} zoom={8} className="w-full h-full" style={{ width: "100vw", height: "100vh" }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -186,9 +232,9 @@ export default function App() {
           <>
             {planeTrails[plane.hex] && (
               <Polyline
-                key={`trail-${plane.hex}`}
+                key={`trail-${plane.hex}-${plane.active ? "active" : "inactive"}`}
                 positions={planeTrails[plane.hex]}
-                color="blue"
+                color={plane.active ? "blue" : "gray"}
                 weight={2}
               />
             )}
@@ -199,7 +245,7 @@ export default function App() {
               home={userLocation}
               onClick={() => {
                 setSelectedFlight(plane.flight.trim());
-                setFlightDetails(null);
+                // setFlightDetails(null);
               }}
             />
           </>
@@ -215,13 +261,13 @@ export default function App() {
       {selectedFlight && (
         <div className="absolute top-4 right-4 bg-white p-4 rounded shadow-md w-64">
           <h2 className="font-bold">Flight: {selectedFlight}</h2>
-          {flightDetails ? (
+          {/* {flightDetails ? (
             <pre className="text-xs overflow-x-auto">
               {JSON.stringify(flightDetails, null, 2)}
             </pre>
           ) : (
             <p>Loading details...</p>
-          )}
+          )} */}
         </div>
       )}
     </div>

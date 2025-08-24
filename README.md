@@ -27,9 +27,9 @@ Plane Tracker is a React + Leaflet web application for visualizing live aircraft
      ```
    - Start the development server:
      ```sh
-     npm start
+     npm run dev
      ```
-   - Open [http://localhost:3000](http://localhost:3000) in your browser.
+   - Open [http://localhost:5174](http://localhost:5174) in your browser.
 
 3. **View live aircraft**
    The app will fetch data from `http://localhost:8080/data.json` and display aircraft on the map.

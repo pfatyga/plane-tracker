@@ -22,3 +22,36 @@
     box-shadow: 0 0 0 0 rgba(51, 136, 255, 0);
   }
 }
+
+.sidebar {
+  position: fixed;
+  top: 1em;
+  right: 1em;
+  border-radius: 10px;
+  width: 280px;
+  max-height: 90%;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px;
+  border-right: 1px solid #ccc;
+  font-family: sans-serif;
+  z-index: 1000; /* higher than leaflet controls */
+}
+
+.sidebar h2 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+.sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sidebar li {
+  padding: 6px 4px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+.sidebar li:hover {
+  background: #f0f8ff;
+}

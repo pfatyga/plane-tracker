@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L, { Marker as LeafletMarker, DivIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -31,22 +31,23 @@ function haversineDistance(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // distance in km
 }
 
 // Custom plane icon (SVG) that can rotate
-const planeIcon = (track: number, active: boolean) =>
+const planeIcon = (track: number, active: boolean, selected: boolean) =>
   L.divIcon({
     className: "plane-icon",
     html: `
       <svg xmlns="http://www.w3.org/2000/svg"
            viewBox="0 0 24 24"
            width="24" height="24"
+           stroke=${selected ? "yellow" : ""} stroke-width="2"
            fill=${active ? "blue" : "gray"}
            style="transform: rotate(${track}deg); transform-origin: center;">
         <path d="M2 16.5l9-4.5V3.5c0-.83.67-1.5 1.5-1.5S14 2.67 14 3.5v8.5l9 4.5v2l-9-2v4l2 1.5v1h-8v-1l2-1.5v-4l-9 2v-2z"/>
@@ -64,12 +65,12 @@ const userIcon = new DivIcon({
 });
 
 // Animated Marker wrapper
-function AnimatedMarker({ plane, onClick, home }: { plane: Plane; onClick: () => void, home: [number, number] | null }) {
+function AnimatedMarker({ plane, onClick, home, selectedFlight }: { plane: Plane; onClick: () => void, home: [number, number] | null, selectedFlight: string | null }) {
   const markerRef = useRef<LeafletMarker | null>(null);
 
   useEffect(() => {
     if (markerRef.current) {
-      markerRef.current.setIcon(planeIcon(plane.track, plane.active));
+      markerRef.current.setIcon(planeIcon(plane.track, plane.active, selectedFlight === plane.flight.trim()));
       markerRef.current.setLatLng([plane.lat, plane.lon]);
     }
   }, [plane]);
@@ -78,7 +79,7 @@ function AnimatedMarker({ plane, onClick, home }: { plane: Plane; onClick: () =>
     <Marker
       ref={markerRef}
       position={[plane.lat, plane.lon]}
-      icon={planeIcon(plane.track, plane.active) as DivIcon}
+      icon={planeIcon(plane.track, plane.active, selectedFlight === plane.flight.trim()) as DivIcon}
       eventHandlers={{ click: onClick }}
     >
       <Popup>
@@ -111,6 +112,7 @@ export default function App() {
   // const [flightDetails, setFlightDetails] = useState<any>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [updateInterval, setUpdateInterval] = useState<number>(500);
+  const mapRef = useRef<any>(null);
 
   // Handler to change update frequency
   const handleIntervalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,7 +175,7 @@ export default function App() {
             updated[key] = trail;
           });
           return updated;
-        }); 
+        });
       } catch (err) {
         console.error("Error fetching plane data:", err);
       }
@@ -222,7 +224,14 @@ export default function App() {
   return (
     <div style={{ width: "100vw", height: "100vh" }} className="w-full h-screen">
       {/* {updateFrequencyControl} */}
-      <MapContainer center={[39.9, -75.1]} zoom={8} className="w-full h-full" style={{ width: "100vw", height: "100vh" }}>
+
+      <MapContainer
+        center={[39.9, -75.1]}
+        zoom={8}
+        className="w-full h-full"
+        style={{ width: "100vw", height: "100vh" }}
+        ref={mapRef}
+      >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
@@ -243,6 +252,7 @@ export default function App() {
               key={plane.hex}
               plane={plane}
               home={userLocation}
+              selectedFlight={selectedFlight}
               onClick={() => {
                 setSelectedFlight(plane.flight.trim());
                 // setFlightDetails(null);
@@ -252,10 +262,10 @@ export default function App() {
         ))}
 
         {userLocation && (
-        <Marker position={userLocation} icon={userIcon}>
-          <Popup>You are here</Popup>
-        </Marker>
-      )}
+          <Marker position={userLocation} icon={userIcon}>
+            <Popup>You are here</Popup>
+          </Marker>
+        )}
       </MapContainer>
 
       {selectedFlight && (
@@ -270,6 +280,37 @@ export default function App() {
           )} */}
         </div>
       )}
+
+      <div className="sidebar">
+        <h2>Flights Seen</h2>
+        <ul>
+          {Array.from(planes.values()).sort((a: Plane, b: Plane) => {
+            if (a.active && !b.active) return -1;
+            if (!a.active && b.active) return 1;
+            // sort by distance from user
+            if (userLocation) {
+              const distA = haversineDistance(userLocation[0], userLocation[1], a.lat, a.lon);
+              const distB = haversineDistance(userLocation[0], userLocation[1], b.lat, b.lon);
+              return distA - distB;
+            }
+            return 0;
+          }).map((plane) => (
+            <li
+              key={plane.hex}
+              className={`${plane.active ? 'active' : 'inactive'}`}
+              onClick={() => {
+                // fly map to plane when clicked
+                if (mapRef.current) {
+                  mapRef.current.setView([plane.lat, plane.lon], 10);
+                  setSelectedFlight(plane.flight.trim());
+                }
+              }}
+            >
+              ✈️ {plane.flight?.trim() || "Unknown"} - {plane.active ? "Active" : "Out of range"}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
